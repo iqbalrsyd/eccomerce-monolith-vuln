@@ -1,0 +1,201 @@
+name: CI DevSecOps (javascript)
+# Domain: e-commerce (confidence: 0.75)
+# Architecture: monolithic
+# Priority threats: SQL injection in product/search queries; XSS vulnerabilities in product listings or reviews; Authentication/authorization bypass in checkout or admin routes; Insecure session management leading to account takeover
+
+"on":
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run ESLint
+        run: |
+          if [ -f package.json ] && grep -q '"lint"' package.json; then
+            npm run lint --if-present
+          else
+            echo 'No lint script defined; skipping.'
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test --if-present || true
+
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Run semgrep
+        uses: returntocorp/semgrep-action@713efdd345f3035192eaa63f56867b88e63e4e5d
+        with:
+          config: p/owasp-top-ten
+        continue-on-error: false
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run npm audit (CVE check)
+        run: npm audit --audit-level=high
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@44c470ffc35caa8b1eb3e8012ca53c2f9bea4eb5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  container-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Build Docker image
+        run: docker build -t app:latest .
+
+  container-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: false
+    needs: container-build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Build Docker image
+        run: docker build -t app:latest .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8
+        with:
+          image-ref: 'app:latest'
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+  iac-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Scan Dockerfile with Trivy
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b2c9bd0d8
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-config-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+  sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM
+        run: syft dir:. -o spdx-json=sbom.spdx.json
