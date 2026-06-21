@@ -1,0 +1,158 @@
+# Semgrep custom rules for HIPAA compliance (healthcare).
+# This file is enabled by scan_directives.py for detected_domain='healthcare'.
+
+rules:
+
+  # =========================================================================
+  # HIPAA Security Rule — Administrative Safeguards
+  # =========================================================================
+
+  - id: hipaa-phi-in-logs
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Possible Protected Health Information (PHI) in log output. HIPAA
+      45 CFR 164.312(b) requires audit controls. Do not log PHI
+      (patient name, MRN, NIK, ICD-10 codes, addresses).
+      Use a logger that redacts sensitive fields.
+    metadata:
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      hipaa: "45 CFR 164.312(b) Audit controls"
+      owasp: "A09:2021 Security Logging and Monitoring Failures"
+    patterns:
+      - pattern-either:
+          - pattern: console.log(..., $PATIENT_NAME, ...)
+          - pattern: console.log(..., $MRN, ...)
+          - pattern: console.log(..., $DIAGNOSIS, ...)
+          - pattern: console.log(..., req.body.ssn, ...)
+          - pattern: logger.info(..., $PATIENT, ...)
+          - pattern: logger.error(..., $PATIENT, ...)
+
+  - id: hipaa-weak-encryption-cipher
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Use of weak/blocked encryption for PHI. HIPAA 45 CFR 164.312(a)(2)(iv)
+      requires strong cryptography. crypto.createCipher (without IV) and
+      crypto.createCipheriv (without random IV) are vulnerable. Use
+      AES-256-GCM with random IV.
+    metadata:
+      cwe: "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+      hipaa: "45 CFR 164.312(a)(2)(iv) Encryption"
+      owasp: "A02:2021 Cryptographic Failures"
+    patterns:
+      - pattern-either:
+          - pattern: crypto.createCipher($ALGO, $KEY)
+          - pattern: |
+              crypto.createCipheriv($ALGO, $KEY, $IV)
+          - pattern: Cipher($ALGO, $KEY)  # Python legacy
+      - pattern-not: |
+          crypto.createCipheriv($ALGO, $KEY, crypto.randomBytes(16))
+      - pattern-not: |
+          crypto.createCipheriv($ALGO, $KEY, randomBytes(16))
+
+  - id: hipaa-unencrypted-network
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      PHI transmission over HTTP (not HTTPS). HIPAA 45 CFR 164.312(e)(1)
+      requires transmission security. All PHI endpoints must use TLS.
+    metadata:
+      cwe: "CWE-319: Cleartext Transmission of Sensitive Information"
+      hipaa: "45 CFR 164.312(e)(1) Transmission security"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              fetch("http://.../*patient*", ...)
+          - pattern: |
+              fetch("http://.../*medical*", ...)
+          - pattern: |
+              $URL = "http://.../*phi*"
+
+  - id: hipaa-fhir-data-exposure
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      FHIR resource returned without access control. HIPAA + FHIR
+      require explicit patient consent and access controls. Validate
+      Consent resource before returning Patient/Observation.
+    metadata:
+      cwe: "CWE-639: Authorization Bypass Through User-Controlled Key"
+      hipaa: "45 CFR 164.308(a)(4) Information access management"
+      owasp-api: "API1:2023 Broken Object Level Authorization"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              res.json($FHIR_PATIENT)
+          - pattern: |
+              return $FHIR_PATIENT
+      - pattern-not: |
+              $RES.json($FHIR_PATIENT)
+      - pattern-not: |
+              return $FHIR_PATIENT if $CONSENT_CHECK
+
+  - id: hipaa-missing-audit-log
+    languages: [javascript, typescript, python]
+    severity: WARNING
+    message: >-
+      PHI access without audit log. HIPAA 45 CFR 164.312(b) requires
+      audit controls for any PHI access. Add a logger.info(...) call
+      with user ID, resource accessed, and timestamp.
+    metadata:
+      cwe: "CWE-778: Insufficient Logging"
+      hipaa: "45 CFR 164.312(b) Audit controls"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $APP.get("/patients/:id", $H)
+          - pattern: |
+              $APP.get("/api/records/:id", $H)
+          - pattern: |
+              $APP.get("/medical-records/:id", $H)
+
+  - id: hipaa-hardcoded-credentials
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Hardcoded credentials in source. HIPAA 45 CFR 164.308(a)(5)(ii)(D)
+      requires periodic password changes. Use env vars or a secret
+      manager. This is also a hard-coded credential risk (CWE-798).
+    metadata:
+      cwe: "CWE-798: Use of Hard-coded Credentials"
+      hipaa: "45 CFR 164.308(a)(5)(ii)(D) Password management"
+    pattern-regex: '(?i)(password|passwd|pwd)\s*[=:]\s*["''][^"'']{4,}["'']'
+
+  - id: hipaa-no-session-expiry
+    languages: [javascript, typescript, python]
+    severity: WARNING
+    message: >-
+      Session without expiry. HIPAA requires automatic logoff after
+      a reasonable period of inactivity (45 CFR 164.312(a)(2)(iii)).
+      Set session timeout to 15 minutes for PHI access.
+    metadata:
+      cwe: "CWE-613: Insufficient Session Expiration"
+      hipaa: "45 CFR 164.312(a)(2)(iii) Automatic logoff"
+    patterns:
+      - pattern-either:
+          - pattern: |
+              app.use(session({}))
+      - pattern-not: 'app.use(session({maxAge: $X}))'
+
+  - id: hipaa-weak-password-hashing
+    languages: [javascript, typescript, python]
+    severity: ERROR
+    message: >-
+      Weak password hashing for PHI access. Use bcrypt (>= 12 rounds),
+      scrypt, or argon2. SHA-1/MD5 are broken.
+    metadata:
+      cwe: "CWE-916: Use of Password Hash With Insufficient Computational Effort"
+      hipaa: "45 CFR 164.308(a)(5)(ii)(D) Password management"
+    patterns:
+      - pattern-either:
+          - pattern: crypto.createHash("md5")
+          - pattern: crypto.createHash("sha1")
+          - pattern: hashlib.md5()
+          - pattern: hashlib.sha1()
+          - pattern: bcrypt.hash(..., 4)  # rounds < 10
+          - pattern: bcrypt.hash(..., 6)
+          - pattern: bcrypt.hash(..., 8)
