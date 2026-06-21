@@ -1,7 +1,7 @@
 name: CI DevSecOps (javascript)
 # Domain: e-commerce (confidence: 0.95)
 # Architecture: monolithic
-# Priority threats: Stripe/PayPal key hardcoded; SQL injection; CSRF
+# Priority threats: Stripe/PayPal key hardcoded
 
 "on":
   push:
@@ -151,7 +151,7 @@ jobs:
         if: always()
         run: |
           if [ ! -s trivy-fs-results.sarif ]; then
-            echo "::notice::{tool_name} found 0 findings. Generating empty SARIF to satisfy upload-sarif."
+            echo "::notice::Trivy found 0 findings. Generating empty SARIF to satisfy upload-sarif."
             printf '%s\n' \
               '{' \
               '  "version": "2.1.0",' \
@@ -241,7 +241,7 @@ jobs:
         if: always()
         run: |
           if [ ! -s trivy-image-results.sarif ]; then
-            echo "::notice::{tool_name} found 0 findings. Generating empty SARIF to satisfy upload-sarif."
+            echo "::notice::Trivy Image found 0 findings. Generating empty SARIF to satisfy upload-sarif."
             printf '%s\n' \
               '{' \
               '  "version": "2.1.0",' \
