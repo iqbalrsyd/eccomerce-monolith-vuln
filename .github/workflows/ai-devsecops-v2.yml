@@ -55,6 +55,7 @@ jobs:
             --config=/src/.semgrep/owasp-api.yml \
             --config=/src/.semgrep/ecommerce.yml \
             --config=/src/.semgrep/pci-dss.yml \
+            --config=/src/.semgrep/pci-stripe.yml \
                     --sarif \
                     --output=/out/semgrep-results.sarif \
                     --timeout=600 \
