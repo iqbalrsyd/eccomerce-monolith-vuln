@@ -1,7 +1,7 @@
 name: CI DevSecOps (javascript)
 # Domain: e-commerce (confidence: 0.95)
 # Architecture: monolithic
-# Priority threats: Stripe/PayPal key hardcoded in source; SQL injection di form checkout; CSRF di payment endpoint
+# Priority threats: Stripe/PayPal key hardcoded; SQL injection; CSRF
 
 "on":
   push:
@@ -228,7 +228,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-  pci-dss:
   pci-dss:
     runs-on: ubuntu-latest
     timeout-minutes: 10
