@@ -99,7 +99,7 @@ jobs:
               ai-devsecops-source: owasp-api.yml
             patterns:
             - pattern-either:
-              - pattern: '$APP.$METH  OD("/$P/:id", $H)
+              - pattern: '$APP.$METHOD("/$P/:id", $H)
           
                   '
               - pattern: 'router.$METHOD("/$P/:id", $H)
