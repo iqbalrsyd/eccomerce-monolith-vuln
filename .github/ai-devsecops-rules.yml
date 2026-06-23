@@ -1,0 +1,865 @@
+          rules:
+          - id: api-bola-missing-ownership-check
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Endpoint menerima object ID (e.g. :id, :orderId, :userId) dari URL tapi
+              tidak verify ownership. Attacker bisa akses resource user lain dengan iterasi
+              ID. OWASP API1:2023.
+            metadata:
+              cwe: 'CWE-639: Authorization Bypass Through User-Controlled Key'
+              owasp-api: API1:2023 Broken Object Level Authorization
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.$METHOD("/$P/:id", $H)
+          
+                  '
+              - pattern: 'router.$METHOD("/$P/:id", $H)
+          
+                  '
+              - pattern: '$APP.$METHOD("/$P/:userId", $H)
+          
+                  '
+              - pattern: '$APP.$METHOD("/$P/:orderId", $H)
+          
+                  '
+          - id: api-auth-bcrypt-missing-rounds
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: bcrypt dengan rounds < 10 tidak cukup. Pakai rounds >= 12 untuk production
+              (OWASP recommendation). OWASP API2:2023.
+            metadata:
+              cwe: 'CWE-916: Use of Password Hash With Insufficient Computational Effort'
+              owasp-api: API2:2023 Broken Authentication
+              ai-devsecops-source: owasp-api.yml
+            pattern-regex: bcrypt\.(?:hash|hashSync)\s*\(\s*[^,]+,\s*([0-9]+|saltRounds\s*:\s*([0-9]+))\s*\)
+          - id: api-auth-no-rate-limit-on-login
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: Endpoint /login atau /auth/login tidak pakai rate limiting. Attacker bisa
+              brute-force password. Pakai express-rate-limit atau library serupa. OWASP API2:2023
+              + API4:2023.
+            metadata:
+              cwe: 'CWE-307: Improper Restriction of Excessive Authentication Attempts'
+              owasp-api: API2:2023 Broken Authentication
+              owasp-api-2: API4:2023 Unrestricted Resource Consumption
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.post("/login", $H)
+          
+                  '
+              - pattern: '$APP.post("/auth/login", $H)
+          
+                  '
+              - pattern: '$APP.post("/api/login", $H)
+          
+                  '
+            - pattern-not: '$APP.post("/login", rateLimit, $H)
+          
+                '
+            - pattern-not: '$APP.post("/auth/login", rateLimit, $H)
+          
+                '
+          - id: api-mass-assignment-spread-body
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Spread `req.body` ke object user/model. Attacker bisa tambah field privilege
+              (is_admin, role) dan escalate. Whitelist allowed fields. OWASP API3:2023.
+            metadata:
+              cwe: 'CWE-915: Improperly Controlled Modification of Dynamically-Determined Object
+                Attributes'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$MODEL.create({...$REQ.body})
+          
+                  '
+              - pattern: '$MODEL.update({...$REQ.body})
+          
+                  '
+          - id: api-excessive-data-exposure
+            languages:
+            - javascript
+            - typescript
+            severity: WARNING
+            message: Response kirim semua field model ke client. Field sensitif (password hash,
+              internal flag, PII) bisa terekspos. Whitelist field yang dikembalikan. OWASP API3:2023.
+            metadata:
+              cwe: 'CWE-213: Exposure of Sensitive Information Due to Incompatible Policies'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'res.json($USER)
+          
+                  '
+              - pattern: 'res.json($MODEL.toJSON())
+          
+                  '
+              - pattern: 'res.json({user: $USER})
+          
+                  '
+          - id: api-no-pagination
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: Endpoint return list tanpa pagination. Attacker bisa fetch semua data sekaligus
+              (DoS / data exfiltration). Pakai limit/offset atau cursor. OWASP API4:2023.
+            metadata:
+              cwe: 'CWE-770: Allocation of Resources Without Limits or Throttling'
+              owasp-api: API4:2023 Unrestricted Resource Consumption
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$MODEL.find()
+          
+                  '
+              - pattern: '$MODEL.findAll()
+          
+                  '
+              - pattern: 'db.query("SELECT * FROM $T")
+          
+                  '
+              - pattern: 'res.json($MODEL.all())
+          
+                  '
+          - id: api-no-max-body-size
+            languages:
+            - javascript
+            - typescript
+            severity: WARNING
+            message: 'Tidak ada limit body size. Attacker bisa kirim payload besar (DoS). Set
+              `express.json({ limit: ''100kb'' })` atau body-parser limit. OWASP API4:2023.'
+            metadata:
+              cwe: 'CWE-770: Allocation of Resources Without Limits or Throttling'
+              owasp-api: API4:2023 Unrestricted Resource Consumption
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern: '$APP.use(express.json())
+          
+                '
+            - pattern-not: '$APP.use(express.json({limit: $L}))
+          
+                '
+            - pattern-not: '$APP.use(express.json({limit:$L}))
+          
+                '
+          - id: api-admin-endpoint-no-role-check
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Endpoint /admin atau /api/admin tidak cek role. Attacker user biasa bisa
+              akses. Pakai middleware `requireRole('admin')` atau equivalent. OWASP API5:2023.
+            metadata:
+              cwe: 'CWE-285: Improper Authorization'
+              owasp-api: API5:2023 Broken Function Level Authorization
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.get("/admin", $H)
+          
+                  '
+              - pattern: '$APP.post("/admin", $H)
+          
+                  '
+              - pattern: '$APP.$METHOD("/api/admin", $H)
+          
+                  '
+            - pattern-not: '$APP.$METHOD("/admin", requireAdmin, $H)
+          
+                '
+          - id: api-ssrf-user-controlled-url
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: URL dari user input dipakai di fetch/request tanpa validasi whitelist.
+              Attacker bisa request internal services (SSRF). OWASP API7:2023.
+            metadata:
+              cwe: 'CWE-918: Server-Side Request Forgery (SSRF)'
+              owasp-api: API7:2023 Server Side Request Forgery
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'fetch($REQ.query.url)
+          
+                  '
+              - pattern: 'fetch($REQ.body.url)
+          
+                  '
+              - pattern: 'requests.get($REQ.json.url)
+          
+                  '
+              - pattern: 'axios.get($REQ.query.url)
+          
+                  '
+              - pattern: 'requests.get($REQ.args.get("url"))
+          
+                  '
+          - id: api-cors-wildcard-origin
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: CORS pakai wildcard `*` origin. Browser akan izinkan request dari domain
+              manapun. Set explicit allowed origins. OWASP API8:2023.
+            metadata:
+              cwe: 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+              owasp-api: API8:2023 Security Misconfiguration
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'Access-Control-Allow-Origin: *
+          
+                  '
+              - pattern: 'res.setHeader("Access-Control-Allow-Origin", "*")
+          
+                  '
+              - pattern: 'origin: "*"
+          
+                  '
+          - id: api-cors-reflect-origin
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: CORS reflect arbitrary Origin header. Attacker bisa paksa browser kirim
+              cookie cross-origin. Set explicit allowlist origin. OWASP API8:2023.
+            metadata:
+              cwe: 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
+              owasp-api: API8:2023 Security Misconfiguration
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'res.setHeader("Access-Control-Allow-Origin", $REQ.headers.origin)
+          
+                  '
+              - pattern: 'Access-Control-Allow-Origin: $REQ.headers.origin
+          
+                  '
+              - pattern: 'cors({ origin: $REQ.headers.origin })
+          
+                  '
+          - id: api-stack-trace-exposure
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: Error response include stack trace atau detail internal. Attacker bisa
+              enumerasi internal structure. Log full error server-side, return generic message
+              ke client. OWASP API8:2023.
+            metadata:
+              cwe: 'CWE-209: Generation of Error Message Containing Sensitive Information'
+              owasp-api: API8:2023 Security Misconfiguration
+              ai-devsecops-source: owasp-api.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'res.json({ error: $ERR.stack })
+          
+                  '
+              - pattern: 'res.json({ error: $ERR.message, stack: $ERR.stack })
+          
+                  '
+              - pattern: 'res.status(500).send($ERR.stack)
+          
+                  '
+              - pattern: 'traceback.format_exc()
+          
+                  '
+          - id: ecommerce-pci-card-data-in-logs
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: 'Jangan log data kartu kredit / payment (PAN, CVV, expiry). PCI-DSS v4.0
+              Requirement 3.4 melarang penyimpanan cleartext PAN di logs. Gunakan masker: `card.number.slice(-4)`
+              atau tokenization.'
+            metadata:
+              cwe: 'CWE-532: Insertion of Sensitive Information into Log File'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              pci-dss: 3.4 Render PAN unreadable anywhere it is stored
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: console.log(..., $CARD, ...)
+              - pattern: console.log(..., req.body.cardNumber, ...)
+              - pattern: console.log(..., req.body.card_number, ...)
+              - pattern: logger.info(..., $PAN, ...)
+              - pattern: console.error(..., $CARD, ...)
+            - metavariable-pattern:
+                metavariable: $CARD
+                patterns:
+                - pattern-either:
+                  - pattern: $REQ.body.cardNumber
+                  - pattern: $REQ.body.card_number
+                  - pattern: $REQ.body.cvv
+                  - pattern: $REQ.body.cvc
+                  - pattern: $X.card.number
+                  - pattern: $X.pan
+          - id: ecommerce-pci-stripe-secret-in-source
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: Stripe live secret key terdeteksi di source. Pindahkan ke env var atau
+              secret manager. Stripe key bocor = attacker bisa charge sembarang customer. PCI-DSS
+              8.2.1.
+            metadata:
+              cwe: 'CWE-798: Use of Hard-coded Credentials'
+              pci-dss: 8.2.1 Strong cryptography to render credentials unreadable
+              owasp: A07:2021 Identification and Authentication Failures
+              ai-devsecops-source: ecommerce.yml
+            pattern-regex: \b(sk_live_[A-Za-z0-9]{24,}|rk_live_[A-Za-z0-9]{24,})\b
+          - id: ecommerce-pci-raw-pan-in-code
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Regex detect pola nomor kartu kredit (16 digit) di kode. Ini indikasi hard-coded
+              test card atau data leak. PCI-DSS melarang hard-coded PAN di source code.
+            metadata:
+              cwe: 'CWE-798: Use of Hard-coded Credentials'
+              pci-dss: 3.4 Render PAN unreadable
+              owasp: A02:2021 Cryptographic Failures
+              ai-devsecops-source: ecommerce.yml
+            pattern-regex: \b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b
+          - id: ecommerce-api-bola-cart-access
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Endpoint mengambil object dengan ID dari URL/body tapi tidak verifikasi
+              ownership terhadap user yang request. Vulnerable ke IDOR / BOLA — attacker bisa
+              akses cart/order customer lain. OWASP API1:2023.
+            metadata:
+              cwe: 'CWE-639: Authorization Bypass Through User-Controlled Key'
+              owasp-api: API1:2023 Broken Object Level Authorization
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$ROUTE.get("/$PATH/:id", $HANDLER)
+          
+                  '
+              - pattern: '$ROUTE.post("/$PATH/:id", $HANDLER)
+          
+                  '
+              - pattern: 'router.$METHOD("/$PATH/:id", $HANDLER)
+          
+                  '
+            - pattern-not: '$ROUTE.$METHOD("/$PATH/:id", authRequired, $HANDLER)
+          
+                '
+            - pattern-not: '$ROUTE.$METHOD("/$PATH/:id", requireAuth, $HANDLER)
+          
+                '
+          - id: ecommerce-api-no-auth-on-checkout
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Endpoint /checkout, /payment, /order, /cart tidak pakai middleware auth.
+              Customer harus login sebelum checkout — kalau tidak, attacker bisa create order
+              tanpa akun. OWASP API5:2023 (Broken Function Level Authorization).
+            metadata:
+              cwe: 'CWE-306: Missing Authentication for Critical Function'
+              owasp-api: API5:2023 Broken Function Level Authorization
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.post("/checkout", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/payment", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/orders", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/cart", $HANDLER)
+          
+                  '
+            - pattern-not: '$APP.post("/checkout", authRequired, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.post("/checkout", isAuthenticated, $HANDLER)
+          
+                '
+          - id: ecommerce-price-tampering
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: 'Harga atau quantity di-set dari request body tanpa validasi server-side.
+              Attacker bisa kirim `{price: 0, quantity: 999999}` dan checkout murah. Selalu
+              ambil price/quantity dari database trusted, bukan dari request.'
+            metadata:
+              cwe: 'CWE-602: Client-Side Enforcement of Server-Side Security'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$PRICE = $REQ.body.price
+          
+                  ...
+          
+                  '
+              - pattern: '$QTY = $REQ.body.quantity
+          
+                  ...
+          
+                  '
+              - pattern: '$TOTAL = $REQ.body.total
+          
+                  ...
+          
+                  '
+              - pattern: '$AMOUNT = $REQ.body.amount
+          
+                  ...
+          
+                  '
+          - id: ecommerce-discount-tampering
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Discount/coupon di-set dari request body tanpa validasi. Attacker bisa
+              pakai kode diskon internal atau apply diskon 100% sendiri. Validate diskon server-side
+              dan hanya apply kode yang verified.
+            metadata:
+              cwe: 'CWE-602: Client-Side Enforcement of Server-Side Security'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$DISCOUNT = $REQ.body.discount
+          
+                  ...
+          
+                  '
+              - pattern: '$COUPON = $REQ.body.coupon_code
+          
+                  ...
+          
+                  '
+          - id: ecommerce-mass-assignment-admin
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: 'Spread `req.body` atau `request.json` langsung ke object user/order. Attacker
+              bisa tambah field `is_admin: true` atau `role: ''admin''` di request body dan
+              escalate privilege. Whitelist field yang diizinkan. OWASP API3:2023.'
+            metadata:
+              cwe: 'CWE-915: Improperly Controlled Modification of Dynamically-Determined Object
+                Attributes'
+              owasp-api: API3:2023 Broken Object Property Level Authorization
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$USER = { ...$REQ.body }
+          
+                  '
+              - pattern: '$USER = Object.assign({}, $REQ.body)
+          
+                  '
+              - pattern: 'User.create($REQ.body)
+          
+                  '
+              - pattern: 'User.update($REQ.body)
+          
+                  '
+              - pattern: 'Order.create($REQ.body)
+          
+                  '
+              - pattern: 'request.json  # FastAPI/Stripe-style: check if this is followed by
+                  direct model instantiation
+          
+                  '
+          - id: ecommerce-sqli-order-lookup
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: SQL injection risk di order/product lookup. User input dipakai di raw SQL
+              string. Gunakan parameterized query. OWASP A03:2021.
+            metadata:
+              cwe: 'CWE-89: SQL Injection'
+              owasp: A03:2021 Injection
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'db.query("SELECT * FROM orders WHERE id = ''" + $ID + "''")
+          
+                  '
+              - pattern: 'db.query(`SELECT * FROM orders WHERE id = ${$ID}`)
+          
+                  '
+              - pattern: 'db.query(`SELECT * FROM products WHERE name LIKE ''%${$X}%''`)
+          
+                  '
+              - pattern: 'db.query("SELECT * FROM products WHERE name = ''" + $NAME + "''")
+          
+                  '
+          - id: ecommerce-xss-product-render
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Render product name/description/review dengan innerHTML atau dangerouslySetInnerHTML.
+              Attacker bisa inject script via product name atau review. Gunakan textContent
+              atau sanitizer. OWASP A03:2021.
+            metadata:
+              cwe: 'CWE-79: Cross-site Scripting'
+              owasp: A03:2021 Injection
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$EL.innerHTML = $REQ.body.productName
+          
+                  '
+              - pattern: '$EL.innerHTML = $REQ.body.review
+          
+                  '
+              - pattern: '<div dangerouslySetInnerHTML={{__html: $REQ.body.description}} />
+          
+                  '
+              - pattern: 'res.send($REQ.body.productName)
+          
+                  '
+          - id: ecommerce-csrf-no-protection
+            languages:
+            - javascript
+            - typescript
+            severity: WARNING
+            message: Payment/checkout endpoint tidak pakai CSRF protection. Pakai csurf, double-submit
+              cookie, atau SameSite=Strict cookie + custom header. OWASP A01:2021.
+            metadata:
+              cwe: 'CWE-352: Cross-Site Request Forgery'
+              owasp: A01:2021 Broken Access Control
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.post("/payment", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/checkout", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/transfer", $HANDLER)
+          
+                  '
+            - pattern-not: '$APP.post("/payment", csrfProtection, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.post("/checkout", csrfProtection, $HANDLER)
+          
+                '
+          - id: ecommerce-jwt-weak-secret
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: JWT secret kelihatannya lemah atau default. JWT sign key HARUS random minimal
+              256-bit, dan HARUS di-load dari env/secret manager — tidak boleh di-hardcode.
+              OWASP API2:2023.
+            metadata:
+              cwe: 'CWE-798: Use of Hard-coded Credentials'
+              owasp-api: API2:2023 Broken Authentication
+              pci-dss: 8.3.1 Strong authentication factors
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: jwt.sign($PAYLOAD, "secret")
+              - pattern: jwt.sign($PAYLOAD, "your-256-bit-secret")
+              - pattern: jwt.sign($PAYLOAD, "changeme")
+              - pattern: jwt.sign($PAYLOAD, "supersecret")
+              - pattern: jwt.sign($PAYLOAD, "default")
+              - pattern: jwt.sign($PAYLOAD, process.env.JWT_SECRET || "secret")
+              - pattern: new hmac($SECRET) where $SECRET == "secret"
+              - pattern: jwt.encode($PAYLOAD, "secret", algorithm="HS256")
+          - id: ecommerce-jwt-no-expiration
+            languages:
+            - javascript
+            - typescript
+            severity: WARNING
+            message: JWT tidak set expiration. Token tanpa expiry = forever valid kalau bocor.
+              Set `expiresIn` di jwt.sign(). OWASP API2:2023.
+            metadata:
+              cwe: 'CWE-613: Insufficient Session Expiration'
+              owasp-api: API2:2023 Broken Authentication
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: jwt.sign($PAYLOAD, $SECRET)
+              - pattern: jwt.sign($PAYLOAD, $SECRET, $ALGO)
+            - pattern-not: 'jwt.sign($PAYLOAD, $SECRET, $ALGO, { expiresIn: $EXP })'
+            - pattern-not: 'jwt.sign($PAYLOAD, $SECRET, { expiresIn: $EXP })'
+          - id: ecommerce-log-sensitive-data
+            languages:
+            - javascript
+            - typescript
+            severity: WARNING
+            message: Log seluruh req.body. Bisa log password, card data, atau PII. Whitelist
+              field yang di-log. PCI-DSS 3.2.
+            metadata:
+              cwe: 'CWE-532: Insertion of Sensitive Information into Log File'
+              pci-dss: 3.2 Protect stored cardholder data
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: console.log(req.body)
+              - pattern: console.log($REQ.body)
+              - pattern: logger.info(req.body)
+              - pattern: winston.info(req.body)
+              - pattern: req.log.info(req.body)
+              - pattern: morgan.token("body", (req) => JSON.stringify(req.body))
+          - id: ecommerce-md5-password
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: MD5 dipakai untuk hash (kemungkinan password). MD5 broken untuk security.
+              Pakai bcrypt, argon2, atau scrypt. PCI-DSS 8.3.2.
+            metadata:
+              cwe: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+              owasp: A02:2021 Cryptographic Failures
+              pci-dss: 8.3.2 Render passwords unreadable during transmission/storage
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: crypto.createHash("md5")
+              - pattern: hashlib.md5()
+              - pattern: require("md5")
+              - pattern: $X.md5($PASSWORD)
+          - id: ecommerce-sha1-password
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: SHA-1 dipakai untuk hash. SHA-1 deprecated untuk security (collision attacks).
+              Pakai SHA-256+ atau bcrypt untuk password.
+            metadata:
+              cwe: 'CWE-327: Use of a Broken or Risky Cryptographic Algorithm'
+              owasp: A02:2021 Cryptographic Failures
+              ai-devsecops-source: ecommerce.yml
+            patterns:
+            - pattern-either:
+              - pattern: crypto.createHash("sha1")
+              - pattern: hashlib.sha1()
+              - pattern: require("sha1")
+          - id: pci-dss-3-4-pan-in-source
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: 'Possible Primary Account Number (PAN) in source code. PCI-DSS v4.0 Req
+              3.4 prohibits storing cleartext PAN. Move to a tokenization service (e.g. Stripe
+              tokens, Braintree vault) or redact (display only last 4 digits: card.number.slice(-4)).'
+            metadata:
+              cwe: 'CWE-312: Cleartext Storage of Sensitive Information'
+              pci-dss: 3.4 Render PAN unreadable anywhere it is stored
+              owasp: A02:2021 Cryptographic Failures
+              ai-devsecops-source: pci-dss.yml
+            pattern-regex: \b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b
+          - id: pci-dss-3-4-cvv-in-source
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: Possible CVV/CVC code in source. PCI-DSS v4.0 Req 3.3 prohibits storing
+              CVV after authorization. This MUST be transmitted directly to the payment processor
+              and never persisted.
+            metadata:
+              cwe: 'CWE-312: Cleartext Storage of Sensitive Information'
+              pci-dss: 3.3 Protect stored cardholder data
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$CVV = $REQ.body.cvv
+          
+                  '
+              - pattern: '$CVV = $REQ.body.cvc
+          
+                  '
+              - pattern: '$X.cvv = $VAL
+          
+                  '
+              - pattern: '$X.cvc = $VAL
+          
+                  '
+              - pattern: 'db.save(..., $CVV, ...)
+          
+                  '
+          - id: pci-dss-3-4-magnetic-stripe-data
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: Possible magnetic stripe data or track data. PCI-DSS forbids storing CVV2,
+              PIN, or full magnetic stripe data after authorization. Reject the entire request
+              and inform the customer.
+            metadata:
+              cwe: 'CWE-312: Cleartext Storage of Sensitive Information'
+              pci-dss: 3.2 Protect stored cardholder data
+              ai-devsecops-source: pci-dss.yml
+            pattern-regex: \b(?:track1|track2|magnetic[-_ ]?stripe)\b
+          - id: pci-dss-4-payment-over-http
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: Payment endpoint over HTTP (not HTTPS). PCI-DSS v4.0 Req 4.2 requires strong
+              cryptography (TLS 1.2+) for transmitting cardholder data over open networks. Use
+              https:// for all payment-related URLs.
+            metadata:
+              cwe: 'CWE-319: Cleartext Transmission of Sensitive Information'
+              pci-dss: 4.2 Use strong cryptography for cardholder data transmission
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$URL = "http://.../*payment*"
+          
+                  '
+              - pattern: '$URL = "http://.../*checkout*"
+          
+                  '
+              - pattern: '$URL = "http://.../*card*"
+          
+                  '
+              - pattern: 'fetch("http://.../*payment*", ...)
+          
+                  '
+          - id: pci-dss-6-5-1-injection-flaws
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: SQL injection in payment context. PCI-DSS v4.0 Req 6.5.1 mandates protection
+              against injection flaws. Use parameterized queries.
+            metadata:
+              cwe: 'CWE-89: SQL Injection'
+              pci-dss: 6.5.1 Address common coding vulnerabilities in software
+              owasp: A03:2021 Injection
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: 'db.query("SELECT * FROM payments WHERE id = ''" + $ID + "''")
+          
+                  '
+              - pattern: 'db.query("SELECT * FROM orders WHERE card_id = ''" + $CARD + "''")
+          
+                  '
+              - pattern: 'db.query(`SELECT * FROM payments WHERE amount = ${$X}`)
+          
+                  '
+          - id: pci-dss-6-5-7-xss
+            languages:
+            - javascript
+            - typescript
+            severity: ERROR
+            message: XSS in payment context (cardholder data exposure). PCI-DSS v4.0 Req 6.5.7
+              requires protection against XSS for any page that handles cardholder data. Sanitize
+              all user input with textContent or a proven sanitizer (DOMPurify).
+            metadata:
+              cwe: 'CWE-79: Cross-site Scripting'
+              pci-dss: 6.5.7 Address common coding vulnerabilities
+              owasp: A03:2021 Injection
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$EL.innerHTML = $REQ.body.billingAddress
+          
+                  '
+              - pattern: 'res.send("<div>" + $REQ.body.cardholderName + "</div>")
+          
+                  '
+          - id: pci-dss-8-3-1-strong-auth-payment
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: ERROR
+            message: Payment endpoint without strong authentication. PCI-DSS v4.0 Req 8.3.1
+              requires strong authentication factors (MFA, OTP, biometrics) for access to cardholder
+              data. Apply authRequired or requireAuth middleware to /payment, /checkout, /api/orders.
+            metadata:
+              cwe: 'CWE-306: Missing Authentication for Critical Function'
+              pci-dss: 8.3.1 Strong authentication for cardholder data access
+              owasp-api: API5:2023 Broken Function Level Authorization
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.post("/payment", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/checkout", $HANDLER)
+          
+                  '
+              - pattern: '$APP.post("/api/charge", $HANDLER)
+          
+                  '
+            - pattern-not: '$APP.post("/payment", authRequired, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.post("/payment", requireAuth, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.post("/payment", isAuthenticated, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.post("/payment", authMiddleware, $HANDLER)
+          
+                '
+          - id: pci-dss-10-2-audit-log-cardholder-access
+            languages:
+            - javascript
+            - typescript
+            - python
+            severity: WARNING
+            message: 'Access to cardholder data without audit log. PCI-DSS v4.0 Req 10.2 requires
+              audit logs for all access to cardholder data. Log: user ID, type of event, time,
+              success/failure, origin.'
+            metadata:
+              cwe: 'CWE-778: Insufficient Logging'
+              pci-dss: 10.2 Audit logs for cardholder data access
+              ai-devsecops-source: pci-dss.yml
+            patterns:
+            - pattern-either:
+              - pattern: '$APP.get("/payment/:id", $HANDLER)
+          
+                  '
+              - pattern: '$APP.get("/api/cards/:id", $HANDLER)
+          
+                  '
+            - pattern-not: '$APP.get("/payment/:id", auditLog, $HANDLER)
+          
+                '
+            - pattern-not: '$APP.get("/payment/:id", $HANDLER, $LOGGER)
+          
+                '
