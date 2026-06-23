@@ -225,15 +225,32 @@ rules:
     ai-devsecops-source: owasp-api.yml
   patterns:
   - pattern-either:
-    - pattern: 'Access-Control-Allow-Origin: *
+    - pattern: 'res.setHeader("Access-Control-Allow-Origin", "*")
 
         '
-    - pattern: 'res.setHeader("Access-Control-Allow-Origin", "*")
+    - pattern: 'res.set("Access-Control-Allow-Origin", "*")
+
+        '
+    - pattern: 'res.header("Access-Control-Allow-Origin", "*")
 
         '
     - pattern: 'origin: "*"
 
         '
+    - patterns:
+      - pattern-inside: '$RES.header({...})
+
+          '
+      - pattern: '"Access-Control-Allow-Origin": "*"
+
+          '
+    - patterns:
+      - pattern-inside: '$RES.headers({...})
+
+          '
+      - pattern: '"Access-Control-Allow-Origin": "*"
+
+          '
 - id: api-cors-reflect-origin
   languages:
   - javascript
@@ -247,15 +264,40 @@ rules:
     ai-devsecops-source: owasp-api.yml
   patterns:
   - pattern-either:
-    - pattern: 'res.setHeader("Access-Control-Allow-Origin", $REQ.headers.origin)
+    - pattern: res.setHeader("Access-Control-Allow-Origin", $REQ.headers.origin)
+    - pattern: res.setHeader("Access-Control-Allow-Origin", $REQ.headers["origin"])
+    - pattern: res.set("Access-Control-Allow-Origin", $REQ.headers.origin)
+    - pattern: res.set("Access-Control-Allow-Origin", $REQ.headers["origin"])
+    - pattern: res.header("Access-Control-Allow-Origin", $REQ.headers.origin)
+    - patterns:
+      - pattern-inside: '$RES.header({...})
 
-        '
-    - pattern: 'Access-Control-Allow-Origin: $REQ.headers.origin
+          '
+      - pattern-either:
+        - pattern: '"Access-Control-Allow-Origin": $REQ.headers.origin
 
-        '
-    - pattern: 'cors({ origin: $REQ.headers.origin })
+            '
+        - pattern: '"Access-Control-Allow-Origin": $REQ.headers["origin"]
 
-        '
+            '
+    - patterns:
+      - pattern-inside: '$RES.headers({...})
+
+          '
+      - pattern-either:
+        - pattern: '"Access-Control-Allow-Origin": $REQ.headers.origin
+
+            '
+        - pattern: '"Access-Control-Allow-Origin": $REQ.headers["origin"]
+
+            '
+    - pattern-either:
+      - pattern: 'cors({ origin: $REQ.headers.origin })
+
+          '
+      - pattern: 'cors({ origin: $REQ.headers["origin"] })
+
+          '
 - id: api-stack-trace-exposure
   languages:
   - javascript
