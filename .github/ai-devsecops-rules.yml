@@ -4,78 +4,169 @@ rules:
   - javascript
   - typescript
   severity: ERROR
-  message: Endpoint menerima object ID (e.g. :id, :orderId, :userId) dari URL tapi
-    tidak verify ownership. Attacker bisa akses resource user lain dengan iterasi
-    ID. OWASP API1:2023.
+  message: Endpoint menerima object ID dari URL (e.g. :id) dan handler tidak meng-verify
+    ownership terhadap user yang request. Attacker bisa akses resource user lain (IDOR).
+    Whitelist resource dengan `WHERE owner_id = :userId` atau equivalent. OWASP API1:2023.
   metadata:
     cwe: 'CWE-639: Authorization Bypass Through User-Controlled Key'
     owasp-api: API1:2023 Broken Object Level Authorization
     ai-devsecops-source: owasp-api.yml
   patterns:
   - pattern-either:
-    - pattern: '$APP.$METHOD("/$P/:id", $H)
+    - pattern: '$ROUTE.$METHOD("/api/orders/:id", $HANDLER)
 
         '
-    - pattern: 'router.$METHOD("/$P/:id", $H)
+    - pattern: '$ROUTE.$METHOD("/api/users/:id", $HANDLER)
 
         '
-    - pattern: '$APP.$METHOD("/$P/:userId", $H)
+    - pattern: '$ROUTE.$METHOD("/api/profile/:id", $HANDLER)
 
         '
-    - pattern: '$APP.$METHOD("/$P/:orderId", $H)
+    - pattern: '$ROUTE.$METHOD("/api/carts/:id", $HANDLER)
 
         '
+    - pattern: '$ROUTE.$METHOD("/api/products/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/api/payments/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/api/transactions/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/api/items/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/api/resources/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/orders/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/users/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/profile/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/carts/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/products/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/payments/:id", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/:userId", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/:orderId", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/:productId", $HANDLER)
+
+        '
+    - pattern: '$ROUTE.$METHOD("/:id", $HANDLER)
+
+        '
+  - pattern-not: '$ROUTE.$METHOD("/api/orders/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/api/users/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/api/profile/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/api/carts/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/orders/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/users/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/:id", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/:userId", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD("/:orderId", $AUTH, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD($PATH, authRequired, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD($PATH, requireAuth, $HANDLER)
+
+      '
+  - pattern-not: '$ROUTE.$METHOD($PATH, isAuthenticated, $HANDLER)
+
+      '
+  - pattern-not-inside: "function $HANDLER($REQ, $RES) {\n  ...\n  $REQ.user.id\n\
+      \  ...\n}\n"
+  - pattern-not-inside: "function $HANDLER($REQ, $RES) {\n  ...\n  $REQ.session.userId\n\
+      \  ...\n}\n"
 - id: api-auth-bcrypt-missing-rounds
   languages:
   - javascript
   - typescript
-  - python
   severity: WARNING
-  message: bcrypt dengan rounds < 10 tidak cukup. Pakai rounds >= 12 untuk production
-    (OWASP recommendation). OWASP API2:2023.
+  message: bcrypt rounds < 10 tidak cukup. Pakai rounds >= 12 untuk production (OWASP
+    recommendation). OWASP API2:2023.
   metadata:
     cwe: 'CWE-916: Use of Password Hash With Insufficient Computational Effort'
     owasp-api: API2:2023 Broken Authentication
     ai-devsecops-source: owasp-api.yml
-  pattern-regex: bcrypt\.(?:hash|hashSync)\s*\(\s*[^,]+,\s*([0-9]+|saltRounds\s*:\s*([0-9]+))\s*\)
+  patterns:
+  - pattern-either:
+    - pattern: bcrypt.hash($PW, 1)
+    - pattern: bcrypt.hash($PW, 2)
+    - pattern: bcrypt.hash($PW, 3)
+    - pattern: bcrypt.hash($PW, 4)
+    - pattern: bcrypt.hash($PW, 5)
+    - pattern: bcrypt.hash($PW, 6)
+    - pattern: bcrypt.hash($PW, 7)
+    - pattern: bcrypt.hash($PW, 8)
+    - pattern: bcrypt.hash($PW, 9)
+    - pattern: bcrypt.hashSync($PW, 1)
+    - pattern: bcrypt.hashSync($PW, 2)
+    - pattern: bcrypt.hashSync($PW, 3)
+    - pattern: bcrypt.hashSync($PW, 4)
+    - pattern: bcrypt.hashSync($PW, 5)
+    - pattern: bcrypt.hashSync($PW, 6)
+    - pattern: bcrypt.hashSync($PW, 7)
+    - pattern: bcrypt.hashSync($PW, 8)
+    - pattern: bcrypt.hashSync($PW, 9)
 - id: api-auth-no-rate-limit-on-login
   languages:
   - javascript
   - typescript
-  - python
   severity: WARNING
-  message: Endpoint /login atau /auth/login tidak pakai rate limiting. Attacker bisa
-    brute-force password. Pakai express-rate-limit atau library serupa. OWASP API2:2023
-    + API4:2023.
+  message: Endpoint /login atau /auth/login terlihat tidak punya rate limiting di
+    file ini. Rate limiting bisa dipasang di infrastructure (Nginx, Cloudflare, AWS
+    WAF) atau middleware global — verifikasi dulu sebelum dianggap vulnerability.
+    OWASP API2:2023 + API4:2023.
   metadata:
     cwe: 'CWE-307: Improper Restriction of Excessive Authentication Attempts'
     owasp-api: API2:2023 Broken Authentication
     owasp-api-2: API4:2023 Unrestricted Resource Consumption
     ai-devsecops-source: owasp-api.yml
-  patterns:
-  - pattern-either:
-    - pattern: '$APP.post("/login", $H)
-
-        '
-    - pattern: '$APP.post("/auth/login", $H)
-
-        '
-    - pattern: '$APP.post("/api/login", $H)
-
-        '
-  - pattern-not: '$APP.post("/login", rateLimit, $H)
-
-      '
-  - pattern-not: '$APP.post("/auth/login", rateLimit, $H)
-
-      '
+  pattern-regex: \bapp\.post\(\s*"(/login|/auth/login|/api/login)"\s*,\s*(?!(rateLimit|slowDown|loginRateLimit|bruteForceProtection|recaptcha|authLimiter)\b)[a-zA-Z_(]
+  pattern-not-regex: \bapp\.post\(\s*"(/login|/auth/login|/api/login)"\s*,\s*(rateLimit|slowDown|loginRateLimit|bruteForceProtection|recaptcha|authLimiter)\b
+  pattern-not-regex-2: \bapp\.use\(\s*(rateLimit|slowDown)\b
 - id: api-mass-assignment-spread-body
   languages:
   - javascript
   - typescript
   severity: ERROR
-  message: Spread `req.body` ke object user/model. Attacker bisa tambah field privilege
-    (is_admin, role) dan escalate. Whitelist allowed fields. OWASP API3:2023.
+  message: 'Spread `req.body` ke object yang digunakan dalam ORM write (create/update)
+    tanpa field whitelisting. Attacker bisa tambah field privilege (`isAdmin: true`,
+    `role: ''admin''`) dan escalate. Whitelist field yang diizinkan dengan destructure
+    atau library `pick()`. OWASP API3:2023.'
   metadata:
     cwe: 'CWE-915: Improperly Controlled Modification of Dynamically-Determined Object
       Attributes'
@@ -89,61 +180,193 @@ rules:
     - pattern: '$MODEL.update({...$REQ.body})
 
         '
+    - pattern: '$MODEL.save({...$REQ.body})
+
+        '
+    - pattern: '$MODEL.create({ ..., ...$REQ.body, ... })
+
+        '
+    - pattern: '$MODEL.update({ ..., ...$REQ.body, ... })
+
+        '
+    - pattern: '$USER = { ...$REQ.body }
+
+        '
+  - pattern-not-inside: 'const { ..., $SAFE_FIELD, ... } = $REQ.body
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = { ..., $SAFE_FIELD, ... } = $REQ.body
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = pick($REQ.body, [...])
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = _.pick($REQ.body, [...])
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = joi.attempt($REQ.body, $SCHEMA)
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = schema.parse($REQ.body)
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = $REQ.body.specificField
+
+      ...
+
+      '
+  - pattern-not-inside: 'const $SAFE = { $FIELD1: $REQ.body.f1, $FIELD2: $REQ.body.f2
+      }
+
+      ...
+
+      '
 - id: api-excessive-data-exposure
   languages:
   - javascript
   - typescript
-  severity: WARNING
-  message: Response kirim semua field model ke client. Field sensitif (password hash,
-    internal flag, PII) bisa terekspos. Whitelist field yang dikembalikan. OWASP API3:2023.
+  severity: ERROR
+  message: Response mengembalikan object yang mengandung field sensitif (`password`,
+    `passwordHash`, `token`, `secret`, `apiKey`, `isAdmin`, `ssn`, `creditCard`, `internalNotes`)
+    tanpa explicit field whitelisting. Gunakan destructure + explicit pick untuk memastikan
+    field sensitif tidak terekspos. OWASP API3:2023.
   metadata:
     cwe: 'CWE-213: Exposure of Sensitive Information Due to Incompatible Policies'
     owasp-api: API3:2023 Broken Object Property Level Authorization
     ai-devsecops-source: owasp-api.yml
   patterns:
   - pattern-either:
-    - pattern: 'res.json($USER)
+    - patterns:
+      - pattern-either:
+        - pattern: res.json({...$OBJ, ...})
+        - pattern: res.json({...$OBJ})
+        - pattern: res.json($OBJ)
+        - pattern: res.send($OBJ)
+      - metavariable-pattern:
+          metavariable: $OBJ
+          patterns:
+          - pattern-either:
+            - pattern: '{ ..., password: $X, ... }
 
-        '
-    - pattern: 'res.json($MODEL.toJSON())
+                '
+            - pattern: '{ ..., passwordHash: $X, ... }
 
-        '
-    - pattern: 'res.json({user: $USER})
+                '
+            - pattern: '{ ..., token: $X, ... }
 
-        '
+                '
+            - pattern: '{ ..., secret: $X, ... }
+
+                '
+            - pattern: '{ ..., apiKey: $X, ... }
+
+                '
+            - pattern: '{ ..., ssn: $X, ... }
+
+                '
+            - pattern: '{ ..., creditCard: $X, ... }
+
+                '
+            - pattern: '{ ..., isAdmin: $X, ... }
+
+                '
+            - pattern: '{ ..., role: "admin", ... }
+
+                '
+            - pattern: '{ ..., internalNotes: $X, ... }
+
+                '
+            - pattern: '{ ..., sessionToken: $X, ... }
+
+                '
+            - pattern: '{ ..., resetToken: $X, ... }
+
+                '
+    - patterns:
+      - pattern-either:
+        - pattern: 'res.json($USER.toJSON())
+
+            '
+        - pattern: 'res.json($USER.toObject())
+
+            '
+        - pattern: 'res.json($MODEL.toJSON())
+
+            '
+      - pattern-inside: '$USER = { ..., password: $X, ... }
+
+          ...
+
+          '
+      - pattern-not-inside: 'const { password: $P, ...$REST } = $USER
+
+          ...
+
+          res.json($REST.toJSON())
+
+          '
+  - pattern-not-inside: 'const { password: $P, ...$REST } = $USER
+
+      ...
+
+      '
+  - pattern-not-inside: 'delete $USER.password
+
+      ...
+
+      '
+  - pattern-not-inside: 'delete $USER.passwordHash
+
+      ...
+
+      '
+  - pattern-not-inside: '$USER = $USER.without(["password", "token", "secret"])
+
+      ...
+
+      '
+  - pattern-not-inside: '$OUT = _.omit($USER, ["password", "token", "secret"])
+
+      ...
+
+      '
+  - pattern-not-inside: "function $MAPPER($U) {\n  const { password: $P, ...$REST\
+      \ } = $U\n  return $REST\n}\n...\n"
 - id: api-no-pagination
   languages:
   - javascript
   - typescript
-  - python
   severity: WARNING
-  message: Endpoint return list tanpa pagination. Attacker bisa fetch semua data sekaligus
-    (DoS / data exfiltration). Pakai limit/offset atau cursor. OWASP API4:2023.
+  message: Endpoint return list dari database tanpa pagination. Attacker bisa fetch
+    semua data sekaligus (DoS / data exfiltration). Pakai `limit`/`offset` atau cursor.
+    OWASP API4:2023.
   metadata:
     cwe: 'CWE-770: Allocation of Resources Without Limits or Throttling'
     owasp-api: API4:2023 Unrestricted Resource Consumption
     ai-devsecops-source: owasp-api.yml
-  patterns:
-  - pattern-either:
-    - pattern: '$MODEL.find()
-
-        '
-    - pattern: '$MODEL.findAll()
-
-        '
-    - pattern: 'db.query("SELECT * FROM $T")
-
-        '
-    - pattern: 'res.json($MODEL.all())
-
-        '
+  pattern-regex: \.(find(?:All)?)\(\s*\)\s*\.\s*then\(
+  pattern-not-regex: \.find(?:All)?\(\s*\)\s*\.\s*then\([^)]*console\.
 - id: api-no-max-body-size
   languages:
   - javascript
   - typescript
   severity: WARNING
-  message: 'Tidak ada limit body size. Attacker bisa kirim payload besar (DoS). Set
-    `express.json({ limit: ''100kb'' })` atau body-parser limit. OWASP API4:2023.'
+  message: 'Tidak ada limit body size di body parser. Attacker bisa kirim payload
+    besar (DoS). Set `express.json({ limit: ''100kb'' })` atau body-parser limit.
+    Body size juga bisa di-set di ingress layer (Nginx `client_max_body_size`). OWASP
+    API4:2023.'
   metadata:
     cwe: 'CWE-770: Allocation of Resources Without Limits or Throttling'
     owasp-api: API4:2023 Unrestricted Resource Consumption
@@ -155,7 +378,7 @@ rules:
   - pattern-not: '$APP.use(express.json({limit: $L}))
 
       '
-  - pattern-not: '$APP.use(express.json({limit:$L}))
+  - pattern-not: '$APP.use(express.json({ limit: $L }))
 
       '
 - id: api-admin-endpoint-no-role-check
@@ -163,26 +386,16 @@ rules:
   - javascript
   - typescript
   severity: ERROR
-  message: Endpoint /admin atau /api/admin tidak cek role. Attacker user biasa bisa
-    akses. Pakai middleware `requireRole('admin')` atau equivalent. OWASP API5:2023.
+  message: Endpoint /admin atau /api/admin tidak terlihat pakai role-check middleware.
+    Attacker user biasa bisa akses admin area. Pakai middleware `requireRole('admin')`
+    atau equivalent. Role check juga bisa dipasang global via `app.use('/admin', isAdmin)`.
+    OWASP API5:2023.
   metadata:
     cwe: 'CWE-285: Improper Authorization'
     owasp-api: API5:2023 Broken Function Level Authorization
     ai-devsecops-source: owasp-api.yml
-  patterns:
-  - pattern-either:
-    - pattern: '$APP.get("/admin", $H)
-
-        '
-    - pattern: '$APP.post("/admin", $H)
-
-        '
-    - pattern: '$APP.$METHOD("/api/admin", $H)
-
-        '
-  - pattern-not: '$APP.$METHOD("/admin", requireAdmin, $H)
-
-      '
+  pattern-regex: \b(app|router)\.(get|post|put|delete|patch)\(\s*"(/admin[^"]*|/api/admin[^"]*|/api/v\d+/admin[^"]*)"\s*,\s*(?!(requireAdmin|isAdmin|requireRole|isAuthorized|ensureAdmin|checkAdmin|hasRole|verifyAdmin|adminAuth|adminRequired|authMiddleware|isAuthenticated|requireAuth|authRequired|adminHandler|adminOnly)\b)[a-zA-Z_(]
+  pattern-not-regex: \bapp\.use\(\s*"/admin[^"]*"\s*,
 - id: api-ssrf-user-controlled-url
   languages:
   - javascript
@@ -190,35 +403,64 @@ rules:
   - python
   severity: ERROR
   message: URL dari user input dipakai di fetch/request tanpa validasi whitelist.
-    Attacker bisa request internal services (SSRF). OWASP API7:2023.
+    Attacker bisa request internal services (SSRF) atau hit metadata endpoint (169.254.169.254).
+    Whitelist domain atau resolve + validate IP. OWASP API7:2023.
   metadata:
     cwe: 'CWE-918: Server-Side Request Forgery (SSRF)'
     owasp-api: API7:2023 Server Side Request Forgery
     ai-devsecops-source: owasp-api.yml
   patterns:
   - pattern-either:
-    - pattern: 'fetch($REQ.query.url)
+    - pattern: fetch($REQ.query.url)
+    - pattern: fetch($REQ.query.$URL_FIELD)
+    - pattern: fetch($REQ.body.url)
+    - pattern: fetch($REQ.body.$URL_FIELD)
+    - pattern: fetch($REQ.params.url)
+    - pattern: fetch($REQ.headers.url)
+    - pattern: axios.get($REQ.query.url)
+    - pattern: axios.get($REQ.body.url)
+    - pattern: axios($REQ.query.url)
+    - pattern: axios($REQ.body.url)
+    - pattern: http.get($REQ.query.url, $CALLBACK)
+    - pattern: http.request($REQ.query.url, $CALLBACK)
+    - pattern: https.get($REQ.query.url, $CALLBACK)
+    - pattern: https.request($REQ.query.url, $CALLBACK)
+    - pattern: got($REQ.query.url)
+    - pattern: got($REQ.body.url)
+    - pattern: nodeFetch($REQ.query.url)
+    - pattern: undici.request($REQ.query.url)
+    - pattern: requests.get($REQ.json.url)
+    - pattern: requests.get($REQ.args.get("url"))
+    - pattern: urllib.request.urlopen($REQ.args.get("url"))
+    - pattern: httpx.get($REQ.json.url)
+    - pattern: aiohttp.ClientSession().get($REQ.json.url)
+  - pattern-not-inside: 'const $VALIDATED = validateUrl($REQ.query.url)
 
-        '
-    - pattern: 'fetch($REQ.body.url)
+      ...
 
-        '
-    - pattern: 'requests.get($REQ.json.url)
+      '
+  - pattern-not-inside: 'const $VALIDATED = new URL($REQ.query.url)
 
-        '
-    - pattern: 'axios.get($REQ.query.url)
+      if (!$ALLOWLIST.has($VALIDATED.hostname)) { ... }
 
-        '
-    - pattern: 'requests.get($REQ.args.get("url"))
+      ...
 
-        '
+      '
+  - pattern-not-inside: 'const $VALIDATED = await isAllowedUrl($REQ.body.url)
+
+      if (!$VALIDATED) { return }
+
+      ...
+
+      '
 - id: api-cors-wildcard-origin
   languages:
   - javascript
   - typescript
   severity: ERROR
   message: CORS pakai wildcard `*` origin. Browser akan izinkan request dari domain
-    manapun. Set explicit allowed origins. OWASP API8:2023.
+    manapun. Set explicit allowed origins (e.g. `https://app.example.com`). OWASP
+    API8:2023.
   metadata:
     cwe: 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
     owasp-api: API8:2023 Security Misconfiguration
@@ -256,8 +498,9 @@ rules:
   - javascript
   - typescript
   severity: ERROR
-  message: CORS reflect arbitrary Origin header. Attacker bisa paksa browser kirim
-    cookie cross-origin. Set explicit allowlist origin. OWASP API8:2023.
+  message: 'CORS reflect arbitrary `Origin` header kembali ke client. Attacker bisa
+    paksa browser kirim cookie cross-origin (CVE-style: Reflected CORS misconfig).
+    Set explicit allowlist origin. OWASP API8:2023.'
   metadata:
     cwe: 'CWE-942: Permissive Cross-domain Policy with Untrusted Domains'
     owasp-api: API8:2023 Security Misconfiguration
@@ -269,6 +512,7 @@ rules:
     - pattern: res.set("Access-Control-Allow-Origin", $REQ.headers.origin)
     - pattern: res.set("Access-Control-Allow-Origin", $REQ.headers["origin"])
     - pattern: res.header("Access-Control-Allow-Origin", $REQ.headers.origin)
+    - pattern: res.header("Access-Control-Allow-Origin", $REQ.headers["origin"])
     - patterns:
       - pattern-inside: '$RES.header({...})
 
@@ -302,11 +546,11 @@ rules:
   languages:
   - javascript
   - typescript
-  - python
   severity: WARNING
-  message: Error response include stack trace atau detail internal. Attacker bisa
+  message: 'Error response include stack trace atau detail internal. Attacker bisa
     enumerasi internal structure. Log full error server-side, return generic message
-    ke client. OWASP API8:2023.
+    ke client. Catatan: rule ini TIDAK flag stack trace di dalam `if (process.env
+    .NODE_ENV === ''development'')` — itu acceptable untuk dev. OWASP API8:2023.'
   metadata:
     cwe: 'CWE-209: Generation of Error Message Containing Sensitive Information'
     owasp-api: API8:2023 Security Misconfiguration
@@ -322,6 +566,17 @@ rules:
     - pattern: 'res.status(500).send($ERR.stack)
 
         '
-    - pattern: 'traceback.format_exc()
+    - pattern: 'res.status($CODE).json({ ..., stack: $ERR.stack, ... })
 
         '
+    - pattern: 'res.json({ ..., stack: $ERR.stack, ... })
+
+        '
+    - pattern: 'res.send($ERR.stack)
+
+        '
+  - pattern-not-inside: "if (process.env.NODE_ENV === 'development') {\n  ...\n}\n"
+  - pattern-not-inside: "if (process.env.NODE_ENV === 'dev') {\n  ...\n}\n"
+  - pattern-not-inside: "if ($ENV === 'development') {\n  ...\n}\n"
+  - pattern-not-inside: "if (!$IS_PROD) {\n  ...\n}\n"
+  - pattern-not-inside: "if (config.env !== 'production') {\n  ...\n}\n"
